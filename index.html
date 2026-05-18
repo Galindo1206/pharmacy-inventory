@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f766e">
+  <title>Inventario Botica</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark">+</span>
+        <div>
+          <strong>Botica Control</strong>
+          <small>Inventario local</small>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+        <button class="nav-btn" data-section="productos">Productos</button>
+        <button class="nav-btn" data-section="scanner">Escaner</button>
+        <button class="nav-btn" data-section="lotes">Lotes</button>
+        <button class="nav-btn" data-section="movimientos">Movimientos</button>
+        <button class="nav-btn" data-section="alertas">Alertas</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu">☰</button>
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p>Control de inventario para botica/farmacia sin backend.</p>
+        </div>
+      </header>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <section class="section active" id="dashboard">
+        <div class="stats-grid" id="dashboardStats"></div>
+        <div class="two-column">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Stock bajo</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Producto</th><th>Stock</th><th>Minimo</th></tr>
+                </thead>
+                <tbody id="dashboardLowStock"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Vencimientos</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Producto</th><th>Lote</th><th>Vence</th><th>Estado</th></tr>
+                </thead>
+                <tbody id="dashboardExpiry"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="productos">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 id="productoFormTitle">Registrar producto</h2>
+            <button class="btn secondary" id="limpiarProductoBtn">Limpiar</button>
+          </div>
+          <form id="productoForm" class="form-grid">
+            <input type="hidden" id="productoId">
+            <label>Nombre del producto<input id="nombre" required placeholder="Ej. Paracetamol"></label>
+            <label>Principio activo<input id="principioActivo" required placeholder="Ej. Paracetamol"></label>
+            <label>Concentracion<input id="concentracion" required placeholder="Ej. 500mg"></label>
+            <label>Forma farmaceutica<input id="forma" required placeholder="Ej. Tableta"></label>
+            <label>Presentacion<input id="presentacion" required placeholder="Ej. Caja x 100"></label>
+            <label>Laboratorio<input id="laboratorio" required placeholder="Ej. Genfar"></label>
+            <label>Categoria terapeutica<input id="categoria" required placeholder="Ej. Analgesico"></label>
+            <label>Codigo de barras<input id="codigoBarras" required placeholder="Escanea o escribe el codigo"></label>
+            <label>Stock minimo<input id="stockMinimo" type="number" min="0" required value="10"></label>
+            <label>Estado
+              <select id="estado">
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+              </select>
+            </label>
+            <div class="form-actions">
+              <button class="btn primary" type="submit">Guardar producto</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head stacked">
+            <h2>Listado de productos</h2>
+            <div class="filters">
+              <input id="buscarNombre" placeholder="Buscar por nombre">
+              <input id="buscarCodigo" placeholder="Buscar por codigo">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th><th>Codigo</th><th>Laboratorio</th><th>Stock</th><th>Min.</th><th>Estado</th><th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="productosTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="scanner">
+        <div class="two-column">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Pistola de codigo</h2>
+            </div>
+            <label class="full-label">Escanear codigo
+              <input id="scannerInput" placeholder="Enfoca aqui y escanea con Enter" autocomplete="off">
+            </label>
+            <div class="scanner-result" id="scannerResult">Esperando lectura...</div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Camara del celular</h2>
+              <div class="button-row">
+                <button class="btn primary" id="activarCamaraBtn">Activar camara</button>
+                <button class="btn danger" id="detenerCamaraBtn">Detener</button>
+              </div>
+            </div>
+            <p class="hint">La camara requiere HTTPS en celular. Netlify, Vercel y GitHub Pages ya lo incluyen.</p>
+            <div id="reader" class="reader"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="lotes">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 id="loteFormTitle">Registrar lote</h2>
+            <button class="btn secondary" id="limpiarLoteBtn">Limpiar</button>
+          </div>
+          <form id="loteForm" class="form-grid">
+            <input type="hidden" id="loteId">
+            <label>Producto asociado<select id="loteProducto" required></select></label>
+            <label>Numero de lote<input id="numeroLote" required placeholder="Ej. L2026A"></label>
+            <label>Cantidad inicial<input id="cantidadInicial" type="number" min="0" required></label>
+            <label>Cantidad actual<input id="cantidadActual" type="number" min="0" required></label>
+            <label>Fecha de vencimiento<input id="fechaVencimiento" type="date" required></label>
+            <div class="form-actions">
+              <button class="btn primary" type="submit">Guardar lote</button>
+            </div>
+          </form>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Listado de lotes</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Producto</th><th>Lote</th><th>Inicial</th><th>Actual</th><th>Vence</th><th>Estado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="lotesTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="movimientos">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Registrar movimiento</h2>
+          </div>
+          <form id="movimientoForm" class="form-grid">
+            <label>Producto<select id="movProducto" required></select></label>
+            <label>Lote<select id="movLote" required></select></label>
+            <label>Tipo de movimiento
+              <select id="movTipo">
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+                <option value="ajuste">Ajuste</option>
+              </select>
+            </label>
+            <label>Cantidad<input id="movCantidad" type="number" min="1" required></label>
+            <label class="wide">Motivo<input id="movMotivo" required placeholder="Compra, venta, merma, conteo fisico..."></label>
+            <div class="form-actions">
+              <button class="btn primary" type="submit">Registrar movimiento</button>
+            </div>
+          </form>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Historial</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Fecha</th><th>Producto</th><th>Lote</th><th>Tipo</th><th>Cantidad</th><th>Motivo</th></tr>
+              </thead>
+              <tbody id="movimientosTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="alertas">
+        <div class="alerts-grid" id="alertasContent"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
