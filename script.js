@@ -98,7 +98,8 @@ function bindEventos() {
     btn.addEventListener("click", () => mostrarSeccion(btn.dataset.section));
   });
 
-  $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  $("#menuToggle").addEventListener("click", alternarMenuMovil);
+  $("#appOverlay").addEventListener("click", cerrarMenuMovil);
   $("#productoForm").addEventListener("submit", agregarProducto);
   $("#loteForm").addEventListener("submit", agregarLote);
   $("#movimientoForm").addEventListener("submit", registrarMovimiento);
@@ -118,8 +119,18 @@ function mostrarSeccion(sectionId) {
   $(`#${sectionId}`).classList.add("active");
   document.querySelector(`[data-section="${sectionId}"]`).classList.add("active");
   $("#pageTitle").textContent = document.querySelector(`[data-section="${sectionId}"]`).textContent;
-  $("#sidebar").classList.remove("open");
+  cerrarMenuMovil();
   renderAll();
+}
+
+function alternarMenuMovil() {
+  $("#sidebar").classList.toggle("open");
+  $("#appOverlay").classList.toggle("show", $("#sidebar").classList.contains("open"));
+}
+
+function cerrarMenuMovil() {
+  $("#sidebar").classList.remove("open");
+  $("#appOverlay").classList.remove("show");
 }
 
 function renderAll() {
@@ -149,9 +160,9 @@ function renderDashboard() {
   $("#dashboardLowStock").innerHTML = bajoStock.length
     ? bajoStock.map((producto) => `
       <tr>
-        <td>${producto.nombre} ${producto.concentracion}</td>
-        <td>${calcularStockProducto(producto.id)}</td>
-        <td>${producto.stockMinimo}</td>
+        <td data-label="Producto">${producto.nombre} ${producto.concentracion}</td>
+        <td data-label="Stock">${calcularStockProducto(producto.id)}</td>
+        <td data-label="Minimo">${producto.stockMinimo}</td>
       </tr>`).join("")
     : filaVacia("No hay productos con stock bajo.", 3);
 
@@ -164,10 +175,10 @@ function renderDashboard() {
       const producto = obtenerProducto(lote.productoId);
       const estado = estadoLote(lote);
       return `<tr>
-        <td>${nombreProducto(producto)}</td>
-        <td>${lote.numero}</td>
-        <td>${formatearFecha(lote.fechaVencimiento)}</td>
-        <td>${badge(estado.texto, estado.clase)}</td>
+        <td data-label="Producto">${nombreProducto(producto)}</td>
+        <td data-label="Lote">${lote.numero}</td>
+        <td data-label="Vence">${formatearFecha(lote.fechaVencimiento)}</td>
+        <td data-label="Estado">${badge(estado.texto, estado.clase)}</td>
       </tr>`;
     }).join("")
     : filaVacia("No hay vencimientos criticos.", 4);
@@ -189,13 +200,13 @@ function renderProductos() {
   $("#productosTable").innerHTML = filtrados.length
     ? filtrados.map((producto) => `
       <tr>
-        <td><strong>${producto.nombre}</strong><br><small>${producto.principioActivo} ${producto.concentracion} - ${producto.forma}</small></td>
-        <td>${producto.codigoBarras}</td>
-        <td>${producto.laboratorio}</td>
-        <td>${calcularStockProducto(producto.id)}</td>
-        <td>${producto.stockMinimo}</td>
-        <td>${badge(producto.estado, producto.estado === "activo" ? "ok" : "gray")}</td>
-        <td>
+        <td data-label="Producto"><strong>${producto.nombre}</strong><br><small>${producto.principioActivo} ${producto.concentracion} - ${producto.forma}</small></td>
+        <td data-label="Codigo">${producto.codigoBarras}</td>
+        <td data-label="Laboratorio">${producto.laboratorio}</td>
+        <td data-label="Stock">${calcularStockProducto(producto.id)}</td>
+        <td data-label="Min.">${producto.stockMinimo}</td>
+        <td data-label="Estado">${badge(producto.estado, producto.estado === "activo" ? "ok" : "gray")}</td>
+        <td data-label="Acciones">
           <button class="btn small secondary" onclick="editarProducto('${producto.id}')">Editar</button>
           <button class="btn small danger" onclick="desactivarProducto('${producto.id}')">Desactivar</button>
         </td>
@@ -348,13 +359,13 @@ function renderLotes() {
       const producto = obtenerProducto(lote.productoId);
       const estado = estadoLote(lote);
       return `<tr>
-        <td>${nombreProducto(producto)}</td>
-        <td>${lote.numero}</td>
-        <td>${lote.cantidadInicial}</td>
-        <td>${lote.cantidadActual}</td>
-        <td>${formatearFecha(lote.fechaVencimiento)}</td>
-        <td>${badge(estado.texto, estado.clase)}</td>
-        <td><button class="btn small secondary" onclick="editarLote('${lote.id}')">Editar</button></td>
+        <td data-label="Producto">${nombreProducto(producto)}</td>
+        <td data-label="Lote">${lote.numero}</td>
+        <td data-label="Inicial">${lote.cantidadInicial}</td>
+        <td data-label="Actual">${lote.cantidadActual}</td>
+        <td data-label="Vence">${formatearFecha(lote.fechaVencimiento)}</td>
+        <td data-label="Estado">${badge(estado.texto, estado.clase)}</td>
+        <td data-label="Acciones"><button class="btn small secondary" onclick="editarLote('${lote.id}')">Editar</button></td>
       </tr>`;
     }).join("")
     : filaVacia("No hay lotes registrados.", 7);
@@ -416,12 +427,12 @@ function renderMovimientos() {
       const producto = obtenerProducto(movimiento.productoId);
       const lote = lotes.find((item) => item.id === movimiento.loteId);
       return `<tr>
-        <td>${formatearFechaHora(movimiento.fecha)}</td>
-        <td>${nombreProducto(producto)}</td>
-        <td>${lote ? lote.numero : "Sin lote"}</td>
-        <td>${badge(movimiento.tipo, movimiento.tipo === "salida" ? "warn" : "info")}</td>
-        <td>${movimiento.cantidad}</td>
-        <td>${movimiento.motivo}</td>
+        <td data-label="Fecha">${formatearFechaHora(movimiento.fecha)}</td>
+        <td data-label="Producto">${nombreProducto(producto)}</td>
+        <td data-label="Lote">${lote ? lote.numero : "Sin lote"}</td>
+        <td data-label="Tipo">${badge(movimiento.tipo, movimiento.tipo === "salida" ? "warn" : "info")}</td>
+        <td data-label="Cantidad">${movimiento.cantidad}</td>
+        <td data-label="Motivo">${movimiento.motivo}</td>
       </tr>`;
     }).join("")
     : filaVacia("No hay movimientos registrados.", 6);

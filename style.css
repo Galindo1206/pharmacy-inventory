@@ -19,21 +19,35 @@
   box-sizing: border-box;
 }
 
+html {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
 }
 
 button, input, select {
   font: inherit;
 }
 
+button {
+  touch-action: manipulation;
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
+}
+
+.app-overlay {
+  display: none;
 }
 
 .sidebar {
@@ -96,6 +110,7 @@ button, input, select {
 .main {
   padding: 24px;
   min-width: 0;
+  width: 100%;
 }
 
 .topbar {
@@ -120,10 +135,12 @@ button, input, select {
   border: 0;
   background: var(--green);
   color: white;
-  width: 44px;
+  min-width: 64px;
   height: 44px;
   border-radius: 8px;
-  font-size: 22px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .section {
@@ -223,6 +240,7 @@ select {
   padding: 10px 12px;
   background: white;
   color: var(--text);
+  min-width: 0;
 }
 
 input:focus,
@@ -271,6 +289,7 @@ select:focus {
   min-height: 34px;
   padding: 7px 10px;
   font-size: 12px;
+  width: auto;
 }
 
 .filters {
@@ -298,6 +317,7 @@ td {
   padding: 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 th {
@@ -339,9 +359,15 @@ tr:last-child td {
 
 .reader {
   min-height: 280px;
+  width: 100%;
   border: 2px dashed var(--line);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.reader video,
+.reader canvas {
+  max-width: 100%;
 }
 
 .hint {
@@ -423,16 +449,27 @@ tr:last-child td {
     position: fixed;
     inset: 0 auto 0 0;
     width: 270px;
+    max-width: 86vw;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
+    box-shadow: 18px 0 45px rgba(16, 24, 40, 0.16);
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
+  .app-overlay.show {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.38);
+    z-index: 9;
+  }
+
   .main {
     padding: 16px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 
   .menu-toggle {
@@ -464,9 +501,164 @@ tr:last-child td {
 
   .btn {
     width: 100%;
+    min-height: 48px;
   }
 
   table {
     min-width: 680px;
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 12px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+
+  .topbar p {
+    font-size: 13px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card strong {
+    font-size: 24px;
+  }
+
+  .panel,
+  .alert-card {
+    padding: 14px;
+  }
+
+  input,
+  select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .table-wrap {
+    border: 0;
+    overflow: visible;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  tr {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: white;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.05);
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(92px, 38%) 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td:last-child {
+    border-bottom: 0;
+  }
+
+  td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  td.empty {
+    display: block;
+    padding: 14px;
+  }
+
+  td.empty::before {
+    content: "";
+  }
+
+  td[data-label="Acciones"] {
+    grid-template-columns: 1fr;
+  }
+
+  td[data-label="Acciones"]::before {
+    margin-bottom: 4px;
+  }
+
+  td[data-label="Acciones"] .btn {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .badge {
+    white-space: normal;
+  }
+
+  .alert-list li {
+    display: grid;
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    gap: 10px;
+  }
+
+  .topbar h1 {
+    font-size: 20px;
+  }
+
+  .menu-toggle {
+    min-width: 58px;
+    height: 42px;
+    padding: 0 10px;
+  }
+
+  td {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }
