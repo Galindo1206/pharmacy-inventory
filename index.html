@@ -26,6 +26,7 @@
         <button class="nav-btn" data-section="lotes">Lotes</button>
         <button class="nav-btn" data-section="movimientos">Movimientos</button>
         <button class="nav-btn" data-section="alertas">Alertas</button>
+        <button class="nav-btn" data-section="importar">Importar</button>
       </nav>
     </aside>
     <div class="app-overlay" id="appOverlay"></div>
@@ -220,6 +221,72 @@
 
       <section class="section" id="alertas">
         <div class="alerts-grid" id="alertasContent"></div>
+      </section>
+
+      <section class="section" id="importar">
+        <div class="two-column">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Importar datos</h2>
+            </div>
+            <form id="importForm" class="form-grid">
+              <label>Tipo de archivo
+                <select id="importTipo">
+                  <option value="productosCsv">Productos CSV</option>
+                  <option value="lotesCsv">Lotes CSV</option>
+                  <option value="respaldoJson">Respaldo JSON completo</option>
+                </select>
+              </label>
+              <label>Modo de importacion
+                <select id="importModo">
+                  <option value="fusionar">Fusionar con datos actuales</option>
+                  <option value="reemplazar">Reemplazar datos actuales</option>
+                </select>
+              </label>
+              <label class="wide">Archivo
+                <input id="importArchivo" type="file" accept=".csv,.json,text/csv,application/json" required>
+              </label>
+              <div class="form-actions">
+                <button class="btn primary" type="submit">Importar archivo</button>
+              </div>
+            </form>
+            <div class="import-result" id="importResultado">Selecciona un archivo CSV o JSON para cargar datos externos.</div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Exportar respaldo</h2>
+            </div>
+            <p class="hint">Descarga todos los productos, lotes y movimientos en un archivo JSON para guardar una copia o moverla a otro dispositivo.</p>
+            <button class="btn secondary" id="exportarJsonBtn">Exportar JSON</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Formatos aceptados</h2>
+          </div>
+          <div class="format-grid">
+            <div class="format-box">
+              <h3>Productos CSV</h3>
+              <pre>nombre,principioActivo,concentracion,forma,presentacion,laboratorio,categoria,codigoBarras,stockMinimo,estado
+Paracetamol,Paracetamol,500mg,Tableta,Caja x 100,Genfar,Analgesico,7750001000011,20,activo</pre>
+            </div>
+            <div class="format-box">
+              <h3>Lotes CSV</h3>
+              <pre>codigoBarras,numero,cantidadInicial,cantidadActual,fechaVencimiento
+7750001000011,PCT-2026-A,60,42,2026-08-15</pre>
+            </div>
+            <div class="format-box">
+              <h3>Respaldo JSON</h3>
+              <pre>{
+  "productos": [],
+  "lotes": [],
+  "movimientos": []
+}</pre>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   </div>

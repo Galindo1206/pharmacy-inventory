@@ -111,6 +111,8 @@ function bindEventos() {
   $("#activarCamaraBtn").addEventListener("click", iniciarScannerCamara);
   $("#detenerCamaraBtn").addEventListener("click", detenerScannerCamara);
   $("#movProducto").addEventListener("change", () => renderSelectLotes($("#movProducto").value));
+  $("#importForm").addEventListener("submit", importarDatos);
+  $("#exportarJsonBtn").addEventListener("click", exportarRespaldoJson);
 }
 
 function mostrarSeccion(sectionId) {
@@ -475,6 +477,327 @@ function registrarMovimiento(event) {
   $("#movimientoForm").reset();
   renderAll();
   mostrarToast("Movimiento registrado.");
+}
+
+async function importarDatos(event) {
+  event.preventDefault();
+  const archivo = $("#importArchivo").files[0];
+  const tipo = $("#importTipo").value;
+  const modo = $("#importModo").value;
+
+  if (!archivo) {
+    mostrarToast("Selecciona un archivo para importar.", true);
+    return;
+  }
+
+  try {
+    const contenido = await leerArchivoTexto(archivo);
+    let resultado;
+
+    if (tipo === "productosCsv") resultado = importarProductosCSV(contenido, modo);
+    if (tipo === "lotesCsv") resultado = importarLotesCSV(contenido, modo);
+    if (tipo === "respaldoJson") resultado = importarRespaldoJSON(contenido, modo);
+
+    guardarDatos();
+    renderAll();
+    $("#importForm").reset();
+    $("#importResultado").textContent = resultado;
+    mostrarToast("Importacion completada.");
+  } catch (error) {
+    console.error(error);
+    $("#importResultado").textContent = error.message;
+    mostrarToast(error.message, true);
+  }
+}
+
+function leerArchivoTexto(archivo) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
+    reader.readAsText(archivo, "UTF-8");
+  });
+}
+
+function importarProductosCSV(contenido, modo) {
+  const filas = parseCSV(contenido);
+  if (!filas.length) throw new Error("El CSV de productos esta vacio.");
+
+  const { headers, rows } = mapearCSV(filas);
+  const requeridos = ["nombre", "principioactivo", "concentracion", "forma", "presentacion", "laboratorio", "categoria", "codigobarras", "stockminimo", "estado"];
+  validarColumnas(headers, requeridos, "productos");
+
+  if (modo === "reemplazar") {
+    productos = [];
+    lotes = [];
+    movimientos = [];
+  }
+
+  let creados = 0;
+  let actualizados = 0;
+
+  rows.forEach((row) => {
+    if (!row.codigobarras || !row.nombre) return;
+    const data = {
+      nombre: row.nombre,
+      principioActivo: row.principioactivo,
+      concentracion: row.concentracion,
+      forma: row.forma,
+      presentacion: row.presentacion,
+      laboratorio: row.laboratorio,
+      categoria: row.categoria,
+      codigoBarras: row.codigobarras,
+      stockMinimo: Number(row.stockminimo || 0),
+      estado: normalizar(row.estado) === "inactivo" ? "inactivo" : "activo"
+    };
+
+    const existente = buscarProductoPorCodigo(data.codigoBarras);
+    if (existente) {
+      Object.assign(existente, data);
+      actualizados++;
+    } else {
+      productos.push({ id: generarId(), ...data, creado: new Date().toISOString() });
+      creados++;
+    }
+  });
+
+  return `Productos importados. Nuevos: ${creados}. Actualizados: ${actualizados}.`;
+}
+
+function importarLotesCSV(contenido, modo) {
+  const filas = parseCSV(contenido);
+  if (!filas.length) throw new Error("El CSV de lotes esta vacio.");
+
+  const { headers, rows } = mapearCSV(filas);
+  const requeridos = ["codigobarras", "numero", "cantidadinicial", "cantidadactual", "fechavencimiento"];
+  validarColumnas(headers, requeridos, "lotes");
+
+  if (modo === "reemplazar") {
+    lotes = [];
+    movimientos = [];
+  }
+
+  let creados = 0;
+  let actualizados = 0;
+  let omitidos = 0;
+
+  rows.forEach((row) => {
+    const producto = buscarProductoPorCodigo(row.codigobarras);
+    if (!producto || !row.numero) {
+      omitidos++;
+      return;
+    }
+
+    const data = {
+      productoId: producto.id,
+      numero: row.numero,
+      cantidadInicial: Number(row.cantidadinicial || 0),
+      cantidadActual: Number(row.cantidadactual || 0),
+      fechaVencimiento: row.fechavencimiento
+    };
+
+    if (!data.fechaVencimiento || data.cantidadActual < 0 || data.cantidadInicial < 0) {
+      omitidos++;
+      return;
+    }
+
+    const existente = lotes.find((lote) => lote.productoId === producto.id && normalizar(lote.numero) === normalizar(data.numero));
+    if (existente) {
+      Object.assign(existente, data);
+      actualizados++;
+    } else {
+      lotes.push({ id: generarId(), ...data, creado: new Date().toISOString() });
+      creados++;
+    }
+  });
+
+  return `Lotes importados. Nuevos: ${creados}. Actualizados: ${actualizados}. Omitidos: ${omitidos}.`;
+}
+
+function importarRespaldoJSON(contenido, modo) {
+  const data = JSON.parse(contenido);
+  if (!Array.isArray(data.productos) || !Array.isArray(data.lotes) || !Array.isArray(data.movimientos)) {
+    throw new Error("El JSON debe tener productos, lotes y movimientos como listas.");
+  }
+
+  if (modo === "reemplazar") {
+    productos = normalizarProductosImportados(data.productos);
+    lotes = normalizarLotesImportados(data.lotes, productos);
+    movimientos = normalizarMovimientosImportados(data.movimientos, productos, lotes);
+    return `Respaldo restaurado. Productos: ${productos.length}. Lotes: ${lotes.length}. Movimientos: ${movimientos.length}.`;
+  }
+
+  let productosNuevos = 0;
+  let productosActualizados = 0;
+  const idProductoMap = new Map();
+
+  normalizarProductosImportados(data.productos).forEach((producto) => {
+    const existente = buscarProductoPorCodigo(producto.codigoBarras);
+    if (existente) {
+      idProductoMap.set(producto.id, existente.id);
+      Object.assign(existente, { ...producto, id: existente.id });
+      productosActualizados++;
+    } else {
+      productos.push(producto);
+      idProductoMap.set(producto.id, producto.id);
+      productosNuevos++;
+    }
+  });
+
+  let lotesNuevos = 0;
+  let lotesActualizados = 0;
+  const idLoteMap = new Map();
+
+  normalizarLotesImportados(data.lotes, productos, idProductoMap).forEach((lote) => {
+    const existente = lotes.find((item) => item.productoId === lote.productoId && normalizar(item.numero) === normalizar(lote.numero));
+    if (existente) {
+      idLoteMap.set(lote.id, existente.id);
+      Object.assign(existente, { ...lote, id: existente.id });
+      lotesActualizados++;
+    } else {
+      lotes.push(lote);
+      idLoteMap.set(lote.id, lote.id);
+      lotesNuevos++;
+    }
+  });
+
+  const movimientosAntes = movimientos.length;
+  normalizarMovimientosImportados(data.movimientos, productos, lotes, idProductoMap, idLoteMap).forEach((movimiento) => {
+    if (!movimientos.some((item) => item.id === movimiento.id)) movimientos.push(movimiento);
+  });
+
+  return `Respaldo fusionado. Productos nuevos: ${productosNuevos}, actualizados: ${productosActualizados}. Lotes nuevos: ${lotesNuevos}, actualizados: ${lotesActualizados}. Movimientos nuevos: ${movimientos.length - movimientosAntes}.`;
+}
+
+function exportarRespaldoJson() {
+  const data = JSON.stringify({ productos, lotes, movimientos }, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const fecha = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `respaldo-botica-${fecha}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  mostrarToast("Respaldo JSON descargado.");
+}
+
+function parseCSV(texto) {
+  const filas = [];
+  let fila = [];
+  let campo = "";
+  let dentroComillas = false;
+
+  for (let i = 0; i < texto.length; i++) {
+    const char = texto[i];
+    const siguiente = texto[i + 1];
+
+    if (char === '"' && dentroComillas && siguiente === '"') {
+      campo += '"';
+      i++;
+    } else if (char === '"') {
+      dentroComillas = !dentroComillas;
+    } else if (char === "," && !dentroComillas) {
+      fila.push(campo.trim());
+      campo = "";
+    } else if ((char === "\n" || char === "\r") && !dentroComillas) {
+      if (char === "\r" && siguiente === "\n") i++;
+      fila.push(campo.trim());
+      if (fila.some((valor) => valor !== "")) filas.push(fila);
+      fila = [];
+      campo = "";
+    } else {
+      campo += char;
+    }
+  }
+
+  fila.push(campo.trim());
+  if (fila.some((valor) => valor !== "")) filas.push(fila);
+  return filas;
+}
+
+function mapearCSV(filas) {
+  const headers = filas[0].map((header) => normalizarClave(header));
+  const rows = filas.slice(1).map((fila) => {
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = fila[index] || "";
+    });
+    return row;
+  });
+  return { headers, rows };
+}
+
+function validarColumnas(headers, requeridos, nombre) {
+  const faltantes = requeridos.filter((columna) => !headers.includes(columna));
+  if (faltantes.length) {
+    throw new Error(`Al CSV de ${nombre} le faltan columnas: ${faltantes.join(", ")}.`);
+  }
+}
+
+function normalizarClave(valor) {
+  return normalizar(valor)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "");
+}
+
+function normalizarProductosImportados(lista) {
+  return lista
+    .filter((producto) => producto && producto.codigoBarras && producto.nombre)
+    .map((producto) => ({
+      id: producto.id || generarId(),
+      nombre: producto.nombre || "",
+      principioActivo: producto.principioActivo || "",
+      concentracion: producto.concentracion || "",
+      forma: producto.forma || "",
+      presentacion: producto.presentacion || "",
+      laboratorio: producto.laboratorio || "",
+      categoria: producto.categoria || "",
+      codigoBarras: String(producto.codigoBarras),
+      stockMinimo: Number(producto.stockMinimo || 0),
+      estado: producto.estado === "inactivo" ? "inactivo" : "activo",
+      creado: producto.creado || new Date().toISOString()
+    }));
+}
+
+function normalizarLotesImportados(lista, productosDisponibles, idProductoMap = new Map()) {
+  const idsProductos = new Set(productosDisponibles.map((producto) => producto.id));
+  return lista
+    .map((lote) => ({ ...lote, productoId: idProductoMap.get(lote.productoId) || lote.productoId }))
+    .filter((lote) => lote && idsProductos.has(lote.productoId) && lote.numero)
+    .map((lote) => ({
+      id: lote.id || generarId(),
+      productoId: lote.productoId,
+      numero: lote.numero || "",
+      cantidadInicial: Number(lote.cantidadInicial || 0),
+      cantidadActual: Number(lote.cantidadActual || 0),
+      fechaVencimiento: lote.fechaVencimiento || "",
+      creado: lote.creado || new Date().toISOString()
+    }));
+}
+
+function normalizarMovimientosImportados(lista, productosDisponibles, lotesDisponibles, idProductoMap = new Map(), idLoteMap = new Map()) {
+  const idsProductos = new Set(productosDisponibles.map((producto) => producto.id));
+  const idsLotes = new Set(lotesDisponibles.map((lote) => lote.id));
+  return lista
+    .map((movimiento) => ({
+      ...movimiento,
+      productoId: idProductoMap.get(movimiento.productoId) || movimiento.productoId,
+      loteId: idLoteMap.get(movimiento.loteId) || movimiento.loteId
+    }))
+    .filter((movimiento) => movimiento && idsProductos.has(movimiento.productoId) && idsLotes.has(movimiento.loteId))
+    .map((movimiento) => ({
+      id: movimiento.id || generarId(),
+      productoId: movimiento.productoId,
+      loteId: movimiento.loteId,
+      tipo: ["entrada", "salida", "ajuste"].includes(movimiento.tipo) ? movimiento.tipo : "ajuste",
+      cantidad: Number(movimiento.cantidad || 0),
+      motivo: movimiento.motivo || "Importado",
+      fecha: movimiento.fecha || new Date().toISOString()
+    }));
 }
 
 function validarStockDisponible(loteId, cantidad) {
